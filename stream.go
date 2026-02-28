@@ -2,7 +2,10 @@ package llama
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -14,15 +17,25 @@ func (c *Client) ChatStream(
 
 	req.Stream = true
 
-	body, _ := json.Marshal(req)
+	body, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
 
-	httpReq, _ := http.NewRequest(
+	httpReq, err := http.NewRequest(
 		"POST",
 		c.BaseURL+"/v1/chat/completions",
-		strings.NewReader(string(body)),
+		bytes.NewReader(body),
 	)
+	if err != nil {
+		return err
+	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
+
+	if c.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
 
 	resp, err := c.HTTP.Do(httpReq)
 	if err != nil {
@@ -30,35 +43,58 @@ func (c *Client) ChatStream(
 	}
 	defer resp.Body.Close()
 
-	scanner := bufio.NewScanner(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %s", resp.Status)
+	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	reader := bufio.NewReader(resp.Body)
 
-		if !strings.HasPrefix(line, "data: ") {
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				return nil // поток корректно завершён
+			}
+			return err
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
-		data := strings.TrimPrefix(line, "data: ")
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 
 		if data == "[DONE]" {
-			break
+			return nil
 		}
 
 		var chunk map[string]any
-		err := json.Unmarshal([]byte(data), &chunk)
-		if err != nil {
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			continue
 		}
 
-		choices := chunk["choices"].([]any)
-		if len(choices) > 0 {
-			delta := choices[0].(map[string]any)["delta"].(map[string]any)
-			if content, ok := delta["content"].(string); ok {
-				onToken(content)
-			}
+		choices, ok := chunk["choices"].([]any)
+		if !ok || len(choices) == 0 {
+			continue
+		}
+
+		firstChoice, ok := choices[0].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		delta, ok := firstChoice["delta"].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if content, ok := delta["content"].(string); ok && content != "" {
+			onToken(content)
 		}
 	}
-
-	return nil
 }
