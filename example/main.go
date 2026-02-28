@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/yourname/go-llama-client"
+	llama "github.com/unidiag/go-llama"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 			},
 			{
 				Role:    "user",
-				Content: "Explain goroutines briefly",
+				Content: "Напиши одно слово: какая главная функия в программе на Golang ?",
 			},
 		},
 		Temperature: 0.7,
