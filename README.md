@@ -77,7 +77,13 @@ err := client.ChatStream(req, func(token string) {
 
 The repository contains working examples:
 
-examples/ ├── stream/ │ └── main.go └── server/ └── main.go
+examples/
+├── simple/
+│    └── main.go 
+├── stream/
+│    └── main.go 
+└── server/
+     └── main.go
 
 ------------------------------------------------------------------------
 
