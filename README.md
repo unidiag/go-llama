@@ -15,7 +15,7 @@ Supports:
 ## Installation
 
 ``` bash
-go get github.com/unidiag/go-llama
+go get github.com/unidiag/go-llama@latest
 ```
 
 ------------------------------------------------------------------------
